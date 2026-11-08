@@ -10,6 +10,7 @@ export const firebaseConfig = {
   storageBucket: "presentation-bookings.firebasestorage.app",
   messagingSenderId: "472118212495",
   appId: "1:472118212495:web:d0a59973d96e12b41b7dfa",
+  databaseURL: "https://presentation-bookings-default-rtdb.firebaseio.com/"
 };
 
 // 2. The lecturer's login account.
