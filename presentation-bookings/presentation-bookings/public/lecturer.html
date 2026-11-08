@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Presentation Bookings – Lecturer</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Gilda+Display&family=Jost:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-page="lecturer">
+
+  <!-- Top strip -->
+  <div class="strip">Presentation bookings &middot; lecturer page</div>
+
+  <!-- Navigation bar -->
+  <nav class="nav">
+    <div class="nav-inner">
+      <div class="brand">
+        <span class="brand-name">Presentation Day</span>
+        <span class="brand-tag">Lecturer</span>
+      </div>
+      <div class="nav-actions">
+        <span id="role-pill" class="pill warn">Connecting…</span>
+        <a id="other-page" class="nav-link hidden" href="index.html">Student page</a>
+        <span id="who" class="small muted"></span>
+        <button id="signout" class="hidden" type="button">Sign out</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Welcome section -->
+  <section class="hero">
+    <div class="hero-inner">
+      <div>
+        <div class="eyebrow">Welcome, presenters</div>
+        <h1 id="hero-title">Your Work Deserves A Proper Stage</h1>
+        <p id="hero-text">Pick a time slot that suits you, see exactly where to go, and walk in prepared.</p>
+      </div>
+      <div class="art" aria-hidden="true">
+        <div class="arch"></div>
+        <div class="ring"></div>
+        <div class="art-card">
+          <span class="eyebrow">Next day</span>
+          <span class="art-card-big tnum" id="hero-next">To be announced</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Statistics band -->
+  <section class="band">
+    <div class="band-inner">
+      <h2>At A <em>Glance</em></h2>
+      <div class="stat">
+        <span class="stat-number tnum" id="stat-days">0</span>
+        <span class="stat-label">Presentation days</span>
+      </div>
+      <div class="stat">
+        <span class="stat-number tnum" id="stat-booked">0</span>
+        <span class="stat-label">Slots booked</span>
+      </div>
+      <div class="stat">
+        <span class="stat-number tnum" id="stat-open">0</span>
+        <span class="stat-label">Slots still open</span>
+      </div>
+    </div>
+  </section>
+
+  <main class="wrap">
+    <div id="status" class="banner warn">Starting…</div>
+
+     <!-- ===== Sign-in screen ===== -->
+    <section id="signin" class="panel signin-panel hidden">
+      <div class="section-head">
+        <div class="eyebrow">Lecturer only</div>
+        <h2>Lecturer Sign In</h2>
+        <p>Enter your PIN to manage presentation days.</p>
+      </div>
+
+      <form id="lecturer-signin-form" class="stack" novalidate>
+        <div class="field full">
+          <label for="signin-pin">PIN</label>
+          <input id="signin-pin" type="password" autocomplete="current-password" required>
+        </div>
+        <div id="auth-error" class="error"></div>
+        <button type="submit" class="primary" id="signin-btn">Sign in</button>
+      </form>
+    </section>
+
+    <!-- ===== Lecturer view ===== -->
+    <section id="lecturer" class="stack-lg hidden">
+      <div class="panel">
+        <div>
+          <div class="eyebrow">For the lecturer</div>
+          <h2>Open A Presentation Day</h2>
+          <div class="muted small">Pick the day, the time window and how long each presentation runs. Slots are created with a short changeover between each one.</div>
+        </div>
+
+        <form id="session-form" class="form-grid" novalidate>
+          <div class="field full">
+            <label for="form-title">Module or assessment</label>
+            <input id="form-title" type="text" placeholder="e.g. Final Year Project – Progress Presentation" maxlength="120">
+          </div>
+          <div class="field">
+            <label for="form-date">Date</label>
+            <input id="form-date" type="date" required>
+          </div>
+          <div class="field">
+            <label for="form-start">First presentation starts</label>
+            <input id="form-start" type="time" value="09:00" required>
+          </div>
+          <div class="field">
+            <label for="form-end">Last presentation ends by</label>
+            <input id="form-end" type="time" value="12:00" required>
+          </div>
+          <div class="field">
+            <label for="form-duration">Presentation length (min)</label>
+            <input id="form-duration" type="number" min="5" max="240" step="5" value="15" required>
+          </div>
+          <div class="field">
+            <label for="form-gap">Changeover between (min)</label>
+            <input id="form-gap" type="number" min="0" max="60" step="1" value="5" required>
+          </div>
+          <div class="field">
+            <label for="form-venue">Venue</label>
+            <input id="form-venue" type="text" placeholder="e.g. Room 2-104, Engineering Building" maxlength="120" required>
+          </div>
+
+          <!-- Break periods are added here by lecturer.js -->
+          <div class="field full">
+            <label id="breaks-label">Break periods (optional)</label>
+            <div class="muted small">Add a tea or lunch break. No presentations are scheduled during it, and slots carry on straight after.</div>
+            <div id="breaks" class="breaks" role="group" aria-labelledby="breaks-label"></div>
+            <button type="button" id="add-break" class="align-start">+ Add a break</button>
+          </div>
+
+          <div class="field full">
+            <label for="form-notes">Notes for students (optional)</label>
+            <textarea id="form-notes" rows="2" maxlength="500" placeholder="e.g. Bring your laptop and an HDMI adapter. Arrive 10 minutes early."></textarea>
+          </div>
+
+          <div class="form-footer">
+            <div id="slot-preview" class="preview tnum"></div>
+            <button class="primary" type="submit" id="form-submit">Publish slots</button>
+          </div>
+          <div id="form-error" class="error field full"></div>
+        </form>
+      </div>
+
+      <div class="stack">
+        <div class="section-head">
+          <div class="eyebrow">Schedule</div>
+          <h2>Your Presentation Days</h2>
+        </div>
+        <div id="lecturer-sessions" class="sessions"></div>
+      </div>
+    </section>
+
+    <!-- ===== Shown when someone other than the lecturer opens this page ===== -->
+    <section id="not-allowed" class="panel signin-panel hidden">
+      <div class="section-head">
+        <div class="eyebrow">Lecturer only</div>
+        <h2>This Page Is For The Lecturer</h2>
+        <p>You're signed in with an account that isn't the lecturer's. To book a presentation slot, go to the student booking page.</p>
+      </div>
+      <a class="button-link primary" href="index.html">Go to the booking page</a>
+    </section>
+
+  </main>
+
+  <!-- Pop-up: "are you sure?" and "change venue" -->
+  <dialog id="confirm-dialog">
+    <form id="confirm-form" method="dialog">
+      <h3 id="confirm-title">Are you sure?</h3>
+      <div id="confirm-body" class="muted"></div>
+      <div class="dialog-actions">
+        <button type="button" id="confirm-no">Keep it</button>
+        <button type="submit" class="primary" id="confirm-yes">Yes</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Small message that appears at the bottom -->
+  <div id="toast" class="toast hidden" role="status"></div>
+
+  <!-- App code (starts in js/app.js) -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

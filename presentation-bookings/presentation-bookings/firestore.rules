@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // The lecturer account (signed in with the PIN).
+    function isLecturer() {
+      return signedIn()
+                && request.auth.token.email == "lecturer@emeris.com";
+    }
+
+    // True if the signed-in person is the student who made this booking.
+    function ownsExisting() {
+      return signedIn() && resource.data.studentId == request.auth.uid;
+    }
+
+    // True if the student number on a new booking is the one the student signed in with.
+    function numberMatchesLogin() {
+      return request.auth.token.email
+               == request.resource.data.studentNumber.lower() + "@student.com";
+    }
+
+    // Presentation days: everyone signed in can see them, only the lecturer can change them.
+    match /sessions/{id} {
+      allow read: if signedIn();
+      allow write: if isLecturer();
+    }
+
+    // Taken slots: no names in here. Students may only book for themselves.
+    match /bookings/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.studentId == request.auth.uid
+        && request.resource.data.keys().hasOnly(
+             ['sessionId', 'slotIndex', 'start', 'end', 'date', 'studentId', 'bookedAt']);
+      allow update: if isLecturer();
+      allow delete: if isLecturer() || ownsExisting();
+    }
+
+    // Private details (name, student number, title): only the lecturer and that student.
+    match /bookingDetails/{id} {
+      allow read: if isLecturer() || ownsExisting();
+      allow create: if signedIn()
+        && request.resource.data.studentId == request.auth.uid
+        && numberMatchesLogin()
+        && getAfter(/databases/$(database)/documents/bookings/$(id)).data.studentId == request.auth.uid;
+      allow update: if isLecturer();
+      allow delete: if isLecturer() || ownsExisting();
+    }
+  }
+}
