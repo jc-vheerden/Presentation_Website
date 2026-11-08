@@ -16,7 +16,7 @@ import {
 } from "./time.js";
 import { $, el, showToast, askConfirm, askForText, friendlyError } from "./ui.js";
 import { createSession, updateSessionVenue, deleteSessionWithBookings, cancelBooking } from "./firebase.js";
-import { sessionInfo } from "./components.js";
+import { sessionInfo, groupByPresentation, presentationGroup } from "./components.js";
 
 // ---------- The "Open a presentation day" form ----------
 
@@ -159,6 +159,9 @@ function updatePreview() {
 
 // Checks the form. Returns an error message, or "" if everything is fine.
 function validateForm(form) {
+  if (!form.title) {
+    return "Add the presentation name. Use the same name for every day of the same presentation.";
+  }
   if (!form.date) {
     return "Choose a date.";
   }
@@ -222,8 +225,19 @@ async function handleSubmit(event) {
 
 // ---------- The list of presentation days ----------
 
-// Draws all of the lecturer's presentation days.
+// Draws all of the lecturer's presentations, one dropdown each, with their days inside.
 export function renderLecturer() {
+  // Suggest names already used, so extra days get exactly the same presentation name.
+  // (Names that only differ in capitals or spaces count as the same presentation.)
+  const names = new Map();
+  for (const session of state.sessions) {
+    const name = String(session.title || "").trim();
+    if (name && !names.has(name.toLowerCase())) {
+      names.set(name.toLowerCase(), name);
+    }
+  }
+  $("presentation-names").replaceChildren(...[...names.values()].map((name) => el("option", { value: name })));
+
   const container = $("lecturer-sessions");
   container.replaceChildren();
 
@@ -234,9 +248,32 @@ export function renderLecturer() {
   }
 
   const today = todayISO();
-  for (const session of sessions) {
-    container.append(renderSessionCard(session, today));
-  }
+  const groups = groupByPresentation(sessions);
+
+  groups.forEach((group, i) => {
+    // Count booked and available slots across all days of this presentation.
+    let totalSlots = 0;
+    let bookedSlots = 0;
+    for (const session of group.sessions) {
+      for (const slot of slotsForSession(session)) {
+        totalSlots = totalSlots + 1;
+        if (findBooking(session.id, slot.index)) {
+          bookedSlots = bookedSlots + 1;
+        }
+      }
+    }
+
+    const dayCount = group.sessions.length;
+    const summaryItems = [
+      el("span", { class: "group-count", text: dayCount + (dayCount === 1 ? " day" : " days") }),
+      el("span", { class: "pill lecturer", text: bookedSlots + " booked" }),
+      el("span", { class: "pill student", text: (totalSlots - bookedSlots) + " available" }),
+    ];
+
+    // The first presentation starts open; the rest start closed.
+    const dayCards = group.sessions.map((session) => renderSessionCard(session, today));
+    container.append(presentationGroup(group, summaryItems, dayCards, i === 0));
+  });
 }
 
 // One presentation day: details, buttons and the timetable.
@@ -284,13 +321,13 @@ function renderTimetable(session, slots) {
       for (const item of breaks) {
         body.append(el("tr", { class: "break" },
           el("td", { class: "tnum", text: formatTime(item.start) + "–" + formatTime(item.end) }),
-          el("td", { colspan: "3", text: item.label })
+          el("td", { colspan: "2", text: item.label })
         ));
       }
     } else if (Number(session.gap) > 0) {
       const changeoverEnd = slot.end + Number(session.gap);
       body.append(el("tr", { class: "changeover" },
-        el("td", { colspan: "4", class: "tnum", text: formatTime(slot.end) + "–" + formatTime(changeoverEnd) + " · changeover" })
+        el("td", { colspan: "3", class: "tnum", text: formatTime(slot.end) + "–" + formatTime(changeoverEnd) + " · changeover" })
       ));
     }
   });
@@ -298,7 +335,6 @@ function renderTimetable(session, slots) {
   const head = el("thead", {}, el("tr", {},
     el("th", { text: "Time" }),
     el("th", { text: "Student" }),
-    el("th", { text: "Presentation" }),
     el("th", {})
   ));
 
@@ -310,7 +346,7 @@ function renderSlotRow(slot, booking) {
   const timeCell = el("td", { class: "tnum", text: formatTime(slot.start) + "–" + formatTime(slot.end) });
 
   if (!booking) {
-    return el("tr", {}, timeCell, el("td", {}, el("span", { class: "muted", text: "Open" })), el("td", {}), el("td", {}));
+    return el("tr", {}, timeCell, el("td", {}, el("span", { class: "muted", text: "Open" })), el("td", {}));
   }
 
   const info = detailsFor(booking);
@@ -318,12 +354,11 @@ function renderSlotRow(slot, booking) {
     el("b", { text: info.studentName || "Loading…" }),
     el("div", { class: "small muted tnum", text: info.studentNumber || "" })
   );
-  const topicCell = el("td", { text: info.topic || "—" });
   const actionCell = el("td", { class: "actions" },
     el("button", { type: "button", class: "link danger", onclick: () => removeBooking(booking) }, "Remove")
   );
 
-  return el("tr", {}, timeCell, studentCell, topicCell, actionCell);
+  return el("tr", {}, timeCell, studentCell, actionCell);
 }
 
 // ---------- Lecturer actions ----------
@@ -409,9 +444,6 @@ async function copySchedule(session) {
     if (booking) {
       const info = detailsFor(booking);
       who = (info.studentName || "Unnamed") + " (" + (info.studentNumber || "no number") + ")";
-      if (info.topic) {
-        who = who + " – " + info.topic;
-      }
     }
     lines.push(formatTime(slot.start) + "–" + formatTime(slot.end) + "  " + who);
   });

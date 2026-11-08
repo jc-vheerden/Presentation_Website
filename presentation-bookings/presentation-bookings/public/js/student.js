@@ -1,12 +1,12 @@
 // =========================================================
-// Student view: see open slots, book one, cancel your booking.
+// Student view: see open slots, book one per presentation, cancel your booking.
 // =========================================================
 
-import { state, findBooking, isMine, upcomingSessions, bookingId } from "./state.js";
+import { state, findBooking, isMine, upcomingSessions, bookingId, myBookingForPresentation } from "./state.js";
 import { formatTime, formatDate, slotsForSession, breaksBetween } from "./time.js";
 import { $, el, showToast, askConfirm, friendlyError } from "./ui.js";
 import { bookSlot, cancelBooking, studentNumberOf } from "./firebase.js";
-import { sessionInfo } from "./components.js";
+import { sessionInfo, groupByPresentation, presentationGroup } from "./components.js";
 
 // The slot the student clicked, kept while the booking pop-up is open.
 let selected = null;
@@ -19,10 +19,10 @@ export function setupBookingDialog() {
   $("book-form").addEventListener("submit", handleBooking);
 }
 
-// Draws the student's own bookings and all the open days.
+// Draws the student's own bookings and all the open presentations.
 export function renderStudent() {
   renderMyBookings();
-  renderAvailableDays();
+  renderPresentations();
 }
 
 // ---------- "Your booking" panel ----------
@@ -48,10 +48,11 @@ function renderMyBookings() {
 
   for (const { booking, session } of mine) {
     const when = formatDate(session.date) + ", " + formatTime(booking.start) + "–" + formatTime(booking.end);
-    const where = "Venue: " + (session.venue || "TBC") + (session.title ? " · " + session.title : "");
+    const where = "Venue: " + (session.venue || "TBC");
 
     container.append(el("div", { class: "my-booking" },
       el("div", {},
+        el("div", { class: "eyebrow", text: session.title || "Presentation" }),
         el("div", { class: "my-booking-when tnum", text: when }),
         el("div", { class: "small", text: where })
       ),
@@ -60,9 +61,9 @@ function renderMyBookings() {
   }
 }
 
-// ---------- Available presentation days ----------
+// ---------- Presentations (one dropdown each) ----------
 
-function renderAvailableDays() {
+function renderPresentations() {
   const container = $("student-sessions");
   container.replaceChildren();
 
@@ -72,8 +73,31 @@ function renderAvailableDays() {
     return;
   }
 
-  for (const session of sessions) {
-    container.append(renderDayCard(session));
+  for (const group of groupByPresentation(sessions)) {
+    // Count the open slots across all days of this presentation.
+    let openSlots = 0;
+    for (const session of group.sessions) {
+      for (const slot of slotsForSession(session)) {
+        if (!findBooking(session.id, slot.index)) {
+          openSlots = openSlots + 1;
+        }
+      }
+    }
+
+    // What shows next to the presentation name.
+    const myBooking = myBookingForPresentation(group.sessions[0]);
+    let summaryItems;
+    if (myBooking) {
+      summaryItems = [el("span", { class: "pill lecturer", text: "Booked ✓" })];
+    } else if (openSlots > 0) {
+      summaryItems = [el("span", { class: "pill student", text: openSlots + (openSlots === 1 ? " slot available" : " slots available") })];
+    } else {
+      summaryItems = [el("span", { class: "pill warn", text: "Fully booked" })];
+    }
+
+    // Presentations the student still needs to book start open.
+    const dayCards = group.sessions.map((session) => renderDayCard(session));
+    container.append(presentationGroup(group, summaryItems, dayCards, !myBooking));
   }
 }
 
@@ -82,12 +106,19 @@ function renderDayCard(session) {
   const slots = slotsForSession(session);
   const openCount = slots.filter((slot) => !findBooking(session.id, slot.index)).length;
 
-  // Students may only hold one slot per day.
-  const alreadyBooked = state.bookings.some((booking) => booking.sessionId === session.id && isMine(booking));
+  // Students may only hold one slot per presentation (across all of its days).
+  const myBooking = myBookingForPresentation(session);
+  const alreadyBooked = Boolean(myBooking);
+  const bookedOnAnotherDay = alreadyBooked && myBooking.sessionId !== session.id;
 
-  const pill = openCount > 0
-    ? el("span", { class: "pill student", text: openCount + " open" })
-    : el("span", { class: "pill warn", text: "Fully booked" });
+  let pill;
+  if (bookedOnAnotherDay) {
+    pill = el("span", { class: "pill student", text: "You're booked on another day" });
+  } else if (openCount > 0) {
+    pill = el("span", { class: "pill student", text: openCount + " open" });
+  } else {
+    pill = el("span", { class: "pill warn", text: "Fully booked" });
+  }
 
   const grid = el("div", { class: "slots" });
 
@@ -96,7 +127,7 @@ function renderDayCard(session) {
     if (i > 0) {
       for (const item of breaksBetween(session, slots[i - 1].end, slot.start)) {
         grid.append(el("div", { class: "slot break" },
-          el("span", { class: "slot-time", text: formatTime(item.start) + "-" + formatTime(item.end) }),
+          el("span", { class: "slot-time", text: formatTime(item.start) + "–" + formatTime(item.end) }),
           el("span", { class: "slot-label", text: item.label })
         ));
       }
@@ -113,7 +144,7 @@ function renderDayCard(session) {
 // One slot: yours, taken by someone else, or open to book.
 function renderSlot(session, slot, alreadyBooked) {
   const booking = findBooking(session.id, slot.index);
-  const time = formatTime(slot.start) + "-" + formatTime(slot.end);
+  const time = formatTime(slot.start) + "–" + formatTime(slot.end);
 
   if (booking && isMine(booking)) {
     return el("div", { class: "slot mine" },
@@ -133,7 +164,7 @@ function renderSlot(session, slot, alreadyBooked) {
     type: "button",
     class: "slot open",
     disabled: alreadyBooked,
-    title: alreadyBooked ? "You already have a slot on this day. Cancel it first to choose another." : "",
+    title: alreadyBooked ? "You already have a slot for this presentation. Cancel it first to choose another." : "",
     onclick: () => openBookingDialog(session, slot),
   },
     el("span", { class: "slot-time", text: time }),
@@ -143,15 +174,16 @@ function renderSlot(session, slot, alreadyBooked) {
 
 // ---------- Booking ----------
 
-// Opens the pop-up for the chosen slot, filling in the student's details if we know them.
+// Opens the pop-up for the chosen slot. The presentation name is filled in for them.
 function openBookingDialog(session, slot) {
   selected = { session: session, slot: slot };
 
-  const summary = formatDate(session.date) + ", " + formatTime(slot.start) + "–" + formatTime(slot.end) + " · " + (session.venue || "Venue TBC");
-  $("book-summary").textContent = summary + " · Student number: " + studentNumberOf(state.user);
+  $("book-presentation").textContent = session.title || "Untitled presentation";
+  $("book-summary").textContent = formatDate(session.date) + ", " + formatTime(slot.start) + "–" + formatTime(slot.end)
+    + " · " + (session.venue || "Venue TBC") + " · Student number: " + studentNumberOf(state.user);
   $("book-error").textContent = "";
 
-  // Remember name and student number on this device so they don't retype it.
+  // Remember the student's name on this device so they don't retype it.
   let saved = {};
   try {
     saved = JSON.parse(localStorage.getItem("presentation-bookings-student") || "{}");
@@ -164,12 +196,7 @@ function openBookingDialog(session, slot) {
   }
 
   $("book-dialog").showModal();
-
-  if ($("book-name").value) {
-    $("book-topic").focus();
-  } else {
-    $("book-name").focus();
-  }
+  $("book-name").focus();
 }
 
 // Saves the booking when the student presses "Confirm booking".
@@ -182,23 +209,21 @@ async function handleBooking(event) {
   const errorBox = $("book-error");
   errorBox.textContent = "";
 
+  const { session, slot } = selected;
   const name = $("book-name").value.trim();
   const number = studentNumberOf(state.user); // from sign-in, so it can't be mistyped
-  const topic = $("book-topic").value.trim();
+  const presentation = session.title || "";   // from the lecturer's day, so it can't be mistyped
 
   if (!name) {
     errorBox.textContent = "Enter your full name.";
     return;
   }
   if (!number) {
-    errorBox.textContent = "Enter your student number.";
+    errorBox.textContent = "Sign in with your student number to book.";
     return;
   }
-
-  const { session, slot } = selected;
-  const alreadyBooked = state.bookings.some((booking) => booking.sessionId === session.id && isMine(booking));
-  if (alreadyBooked) {
-    errorBox.textContent = "You already have a slot on this day. Cancel it first to choose another.";
+  if (myBookingForPresentation(session)) {
+    errorBox.textContent = "You already have a slot for this presentation. Cancel it first to choose another.";
     return;
   }
 
@@ -223,7 +248,7 @@ async function handleBooking(event) {
       studentId: state.user.uid,
       studentName: name,
       studentNumber: number,
-      topic: topic,
+      topic: presentation,
     };
 
     const booked = await bookSlot(bookingId(session.id, slot.index), slotInfo, details);
@@ -234,14 +259,13 @@ async function handleBooking(event) {
     }
 
     try {
-      localStorage.setItem("presentation-bookings-student", JSON.stringify({ name: name }))
+      localStorage.setItem("presentation-bookings-student", JSON.stringify({ name: name }));
     } catch (error) {
       // Saving on the device is optional, so ignore errors here.
     }
 
-    $("book-topic").value = "";
     $("book-dialog").close();
-    showToast("Booked: " + formatDate(session.date) + " at " + formatTime(slot.start));
+    showToast("Booked: " + (presentation || "presentation") + ", " + formatDate(session.date) + " at " + formatTime(slot.start));
   } catch (error) {
     errorBox.textContent = friendlyError(error);
   } finally {

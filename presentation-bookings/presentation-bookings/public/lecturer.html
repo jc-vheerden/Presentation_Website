@@ -75,7 +75,6 @@
   <main class="wrap">
     <div id="status" class="banner warn">Starting…</div>
 
-    
     <!-- ===== Lecturer view ===== -->
     <section id="lecturer" class="stack-lg hidden">
       <div class="panel">
@@ -87,8 +86,10 @@
 
         <form id="session-form" class="form-grid" novalidate>
           <div class="field full">
-            <label for="form-title">Module or assessment</label>
-            <input id="form-title" type="text" placeholder="e.g. Final Year Project – Progress Presentation" maxlength="120">
+            <label for="form-title">Presentation name</label>
+            <input id="form-title" type="text" list="presentation-names" placeholder="e.g. Final Year Project – Progress Presentation" maxlength="120" required>
+            <datalist id="presentation-names"></datalist>
+            <div class="muted small">Use the same name for every day of the same presentation. Students can book one slot per presentation.</div>
           </div>
           <div class="field">
             <label for="form-date">Date</label>
@@ -150,7 +151,7 @@
       <div class="section-head">
         <div class="eyebrow">Lecturer only</div>
         <h2>This Page Is For The Lecturer</h2>
-        <p>You're signed in with an account that isn't the lecturer's. To book a presentation slot, go to the student booking page.</p>
+        <p>You're signed in as a student. To book a presentation slot, go to the booking page.</p>
       </div>
       <a class="button-link primary" href="index.html">Go to the booking page</a>
     </section>

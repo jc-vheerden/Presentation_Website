@@ -315,7 +315,6 @@ h3 {
   justify-self: center;
 }
 
-
 /* Student / Lecturer choice on the sign-in box */
 .choice {
   display: grid;
@@ -333,8 +332,6 @@ h3 {
   background: var(--cocoa);
   color: var(--cocoa-text);
 }
-
-
 
 /* ---------- Labels / pills ---------- */
 .pill {
@@ -406,7 +403,8 @@ h3 {
   grid-column: 1 / -1;
 }
 
-label {
+label,
+.field-label {
   font-size: 0.68rem;
   font-weight: 500;
   letter-spacing: 0.16em;
@@ -622,6 +620,76 @@ button.link.danger {
   gap: 6px;
 }
 
+/* A value students can see but not change (e.g. the presentation name) */
+.readonly-value {
+  padding: 10px 12px;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  background: var(--accent-soft);
+  border: 1px solid var(--line);
+}
+
+/* ---------- Presentation dropdowns ---------- */
+.group {
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.group-summary {
+  padding: 18px 22px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  list-style: none; /* hides the default triangle */
+}
+
+.group-summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Our own arrow before the name: points right when closed, down when open */
+.group-name::before {
+  content: "\25B8";
+  display: inline-block;
+  margin-right: 12px;
+  color: var(--accent);
+  transition: transform 0.15s;
+}
+
+.group[open] .group-name::before {
+  transform: rotate(90deg);
+}
+
+.group-name {
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+}
+
+.group-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.group-count {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.group-body {
+  padding: 0 22px 22px;
+  display: grid;
+  gap: 16px;
+}
+
+.group-summary:hover .group-name {
+  color: var(--accent-dark);
+}
+
 /* ---------- Lecturer timetable ---------- */
 .table-wrap {
   overflow-x: auto;
@@ -630,7 +698,16 @@ button.link.danger {
 table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed; /* same column widths on every day */
   font-size: 0.93rem;
+}
+
+th:first-child {
+  width: 170px; /* Time column */
+}
+
+th:last-child {
+  width: 120px; /* Remove button column */
 }
 
 th,
@@ -863,6 +940,49 @@ dialog form {
   th,
   td {
     padding: 9px 14px;
+  }
+
+  /* Narrower timetable columns so the name and "Remove" don't overlap */
+  th:first-child {
+    width: 110px;
+  }
+
+  th:last-child {
+    width: 84px;
+  }
+
+  tr.changeover td {
+    padding: 3px 14px;
+  }
+
+  /* Less padding inside dropdowns and day cards, so there's more room */
+  .group-summary {
+    padding: 14px 16px;
+  }
+
+  .group-name {
+    font-size: 1.25rem;
+  }
+
+  .group-body {
+    padding: 0 10px 10px;
+  }
+
+  .session-head {
+    padding: 16px;
+  }
+
+  .session-date {
+    font-size: 1.3rem;
+  }
+
+  .session-side {
+    justify-items: start;
+  }
+
+  .slots {
+    padding: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
   }
 }
 

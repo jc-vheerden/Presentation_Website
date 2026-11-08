@@ -30,6 +30,30 @@ export function detailsFor(booking) {
   return state.details[booking.id] || {};
 }
 
+// Days that belong to the same presentation share the same name (title).
+// Returns a key for grouping them, e.g. "final year project".
+export function presentationKey(session) {
+  const name = String(session.title || "").trim().toLowerCase();
+  if (name) {
+    return name;
+  }
+  return "day:" + session.id; // no name: the day stands on its own
+}
+
+// The signed-in student's booking for the same presentation as this day, or undefined.
+export function myBookingForPresentation(session) {
+  const key = presentationKey(session);
+  return state.bookings.find((booking) => {
+    if (!isMine(booking)) {
+      return false;
+    }
+    const bookedDay = state.sessions.find((item) => item.id === booking.sessionId);
+    return Boolean(bookedDay) && presentationKey(bookedDay) === key;
+  });
+}
+
+
+
 // True if the booking belongs to the signed-in student.
 export function isMine(booking) {
   return Boolean(state.user && booking && booking.studentId === state.user.uid);

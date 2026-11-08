@@ -75,8 +75,7 @@
   <main class="wrap">
     <div id="status" class="banner warn">Starting…</div>
 
-       <!-- ===== Sign-in screen ===== -->
-       <!-- ===== Sign-in screen (student or lecturer) ===== -->
+    <!-- ===== Sign-in screen (student or lecturer) ===== -->
     <section id="signin" class="panel signin-panel hidden">
       <div class="section-head">
         <div class="eyebrow">Welcome</div>
@@ -122,7 +121,7 @@
         <div class="section-head">
           <div class="eyebrow">Book a slot</div>
           <h2>Available Presentation Days</h2>
-          <p>Choose an open slot to book it. Booked slots are crossed out.</p>
+          <p>Choose an open slot to book it. You can book one slot per presentation.</p>
         </div>
         <div id="student-sessions" class="sessions"></div>
       </div>
@@ -133,16 +132,16 @@
   <dialog id="book-dialog">
     <form id="book-form" method="dialog" novalidate>
       <h3>Book This Slot</h3>
+      <div class="field full">
+        <span class="field-label">Presentation</span>
+        <div id="book-presentation" class="readonly-value"></div>
+      </div>
       <div id="book-summary" class="dialog-summary tnum"></div>
       <div class="field full">
         <label for="book-name">Full name</label>
         <input id="book-name" type="text" required maxlength="80" autocomplete="name">
       </div>
-    
-      <div class="field full">
-        <label for="book-topic">Project / presentation title</label>
-        <input id="book-topic" type="text" maxlength="150">
-      </div>
+
       <div id="book-error" class="error"></div>
       <div class="dialog-actions">
         <button type="button" id="book-cancel">Cancel</button>
