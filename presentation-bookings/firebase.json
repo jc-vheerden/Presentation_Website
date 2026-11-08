@@ -1,0 +1,10 @@
+{
+  "hosting": {
+    "public": "presentation-bookings/public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
+  }
+}
