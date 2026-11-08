@@ -315,6 +315,27 @@ h3 {
   justify-self: center;
 }
 
+
+/* Student / Lecturer choice on the sign-in box */
+.choice {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--line);
+}
+
+.choice-btn {
+  border: none;
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.choice-btn.active {
+  background: var(--cocoa);
+  color: var(--cocoa-text);
+}
+
+
+
 /* ---------- Labels / pills ---------- */
 .pill {
   display: inline-block;

@@ -76,20 +76,38 @@
     <div id="status" class="banner warn">Starting…</div>
 
        <!-- ===== Sign-in screen ===== -->
+       <!-- ===== Sign-in screen (student or lecturer) ===== -->
     <section id="signin" class="panel signin-panel hidden">
       <div class="section-head">
         <div class="eyebrow">Welcome</div>
-        <h2>Sign In To Book</h2>
-        <p>Enter your student number to see the open slots.</p>
+        <h2>Sign In</h2>
+        <p>Choose who you are, then sign in.</p>
       </div>
 
+      <!-- The two choices -->
+      <div class="choice" role="tablist" aria-label="Sign in as">
+        <button type="button" id="choose-student" class="choice-btn active" role="tab" aria-selected="true">Student</button>
+        <button type="button" id="choose-lecturer" class="choice-btn" role="tab" aria-selected="false">Lecturer</button>
+      </div>
+
+      <!-- Student: student number only -->
       <form id="student-signin-form" class="stack" novalidate>
         <div class="field full">
           <label for="signin-number">Student number</label>
-          <input id="signin-number" type="text" placeholder="ST1234567" maxlength="9" autocomplete="username" autocapitalize="characters" spellcheck="false" required>
+          <input id="signin-number" type="text" placeholder="ST12345678" maxlength="10" autocomplete="username" autocapitalize="characters" spellcheck="false" required>
         </div>
         <div id="auth-error" class="error"></div>
         <button type="submit" class="primary" id="signin-btn">Sign in</button>
+      </form>
+
+      <!-- Lecturer: PIN only -->
+      <form id="lecturer-signin-form" class="stack hidden" novalidate>
+        <div class="field full">
+          <label for="signin-pin">PIN</label>
+          <input id="signin-pin" type="password" autocomplete="current-password" required>
+        </div>
+        <div id="pin-error" class="error"></div>
+        <button type="submit" class="primary" id="pin-btn">Sign in</button>
       </form>
     </section>
 

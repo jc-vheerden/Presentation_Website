@@ -1,28 +1,58 @@
 // =========================================================
-// The sign-in screens:
-//   index.html    – students sign in with their student number
-//   lecturer.html – the lecturer signs in with a PIN
+// The sign-in box on the booking page (index.html).
+// People choose "Student" (student number) or "Lecturer" (PIN).
 // =========================================================
 
 import { $ } from "./ui.js";
 import { isValidStudentNumber, signInStudent, signInLecturer, signOutUser } from "./firebase.js";
 
-// Sets up the sign-in form and the sign-out button. Called once when the page loads.
+// Sets up the sign-in box and the sign-out button. Called once when the page loads.
 export function setupSignIn() {
+  // The sign-out button is on both pages. After signing out,
+  // the lecturer page sends you back to the sign-in box by itself.
   $("signout").addEventListener("click", () => {
     signOutUser();
   });
 
-  if ($("student-signin-form")) {
-    $("student-signin-form").addEventListener("submit", handleStudentSignIn);
+  // The lecturer page has no sign-in box, so stop here.
+  if (!$("signin")) {
+    return;
   }
 
-  if ($("lecturer-signin-form")) {
-    $("lecturer-signin-form").addEventListener("submit", handleLecturerSignIn);
+  $("choose-student").addEventListener("click", () => {
+    showChoice("student");
+  });
+  $("choose-lecturer").addEventListener("click", () => {
+    showChoice("lecturer");
+  });
+
+  $("student-signin-form").addEventListener("submit", handleStudentSignIn);
+  $("lecturer-signin-form").addEventListener("submit", handleLecturerSignIn);
+}
+
+// Shows the student form or the lecturer form.
+function showChoice(who) {
+  const isStudent = who === "student";
+
+  $("choose-student").classList.toggle("active", isStudent);
+  $("choose-lecturer").classList.toggle("active", !isStudent);
+  $("choose-student").setAttribute("aria-selected", String(isStudent));
+  $("choose-lecturer").setAttribute("aria-selected", String(!isStudent));
+
+  $("student-signin-form").classList.toggle("hidden", !isStudent);
+  $("lecturer-signin-form").classList.toggle("hidden", isStudent);
+
+  // Clear old messages and put the cursor in the right box.
+  $("auth-error").textContent = "";
+  $("pin-error").textContent = "";
+  if (isStudent) {
+    $("signin-number").focus();
+  } else {
+    $("signin-pin").focus();
   }
 }
 
-// Student signs in with their student number (e.g. ST1234567).
+// Student signs in with their student number (e.g. ST12345678).
 async function handleStudentSignIn(event) {
   event.preventDefault();
 
@@ -31,7 +61,7 @@ async function handleStudentSignIn(event) {
   errorBox.textContent = "";
 
   if (!isValidStudentNumber(number)) {
-    errorBox.textContent = "Enter your student number: ST followed by 7 numbers, e.g. ST1234567.";
+    errorBox.textContent = "Enter your student number: ST followed by 8 numbers, e.g. ST12345678.";
     return;
   }
 
@@ -47,11 +77,11 @@ async function handleStudentSignIn(event) {
   }
 }
 
-// Lecturer signs in with the PIN.
+// Lecturer signs in with the PIN, then goes to the lecturer page.
 async function handleLecturerSignIn(event) {
   event.preventDefault();
 
-  const errorBox = $("auth-error");
+  const errorBox = $("pin-error");
   const pin = $("signin-pin").value;
   errorBox.textContent = "";
 
@@ -60,12 +90,12 @@ async function handleLecturerSignIn(event) {
     return;
   }
 
-  const button = $("signin-btn");
+  const button = $("pin-btn");
   button.disabled = true;
 
   try {
     await signInLecturer(pin);
-    $("signin-pin").value = "";
+    window.location.href = "lecturer.html";
   } catch (error) {
     const code = (error && error.code) || "";
     if (code.includes("invalid-credential") || code.includes("wrong-password") || code.includes("user-not-found")) {
@@ -73,7 +103,6 @@ async function handleLecturerSignIn(event) {
     } else {
       errorBox.textContent = signInMessage(error);
     }
-  } finally {
     button.disabled = false;
   }
 }

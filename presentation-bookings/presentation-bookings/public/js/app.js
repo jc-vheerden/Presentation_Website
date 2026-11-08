@@ -35,7 +35,10 @@ function render() {
   const signedIn = Boolean(state.user);
 
   // Sign-in screen and nav bar
-  $("signin").classList.toggle("hidden", signedIn);
+  // Sign-in screen (only on the booking page) and nav bar
+  if ($("signin")) {
+    $("signin").classList.toggle("hidden", signedIn);
+  }
   $("signout").classList.toggle("hidden", !signedIn);
   if (!signedIn) {
     $("who").textContent = "";
@@ -230,6 +233,12 @@ function stopListening() {
 
 // Runs whenever someone signs in or out.
 function handleUserChanged(user) {
+  // The lecturer page has no sign-in box, so send signed-out visitors to the booking page.
+  if (onLecturerPage && !user) {
+    window.location.href = "index.html";
+    return;
+  }
+
   stopListening();
 
   state.user = user;
