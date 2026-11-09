@@ -2,7 +2,7 @@
 // Lecturer view: open presentation days and manage bookings.
 // =========================================================
 
-import { state, findBooking, sortedSessions, detailsFor } from "./state.js";
+import { state, findBooking, sortedSessions, detailsFor, presentationKey, presentationTypeText } from "./state.js";
 import {
   toMinutes,
   formatTime,
@@ -41,8 +41,43 @@ export function setupLecturerForm() {
     }
   });
 
+  // Show "Max members per group" only for group presentations.
+  $("form-type").addEventListener("change", showGroupFields);
+
+  // If the name matches an existing presentation, copy its type so all its days match.
+  $("form-title").addEventListener("input", copyTypeFromExisting);
+
   $("session-form").addEventListener("submit", handleSubmit);
   updatePreview();
+}
+
+// Shows or hides the "Max members per group" box.
+function showGroupFields() {
+  $("max-field").classList.toggle("hidden", $("form-type").value !== "group");
+}
+
+// Finds an existing day with the same presentation name, or undefined.
+function existingDayWithName(title) {
+  const key = String(title || "").trim().toLowerCase();
+  if (!key) {
+    return undefined;
+  }
+  return state.sessions.find((session) => presentationKey(session) === key);
+}
+
+// When the lecturer types a name that's already used, set the type to match it.
+function copyTypeFromExisting() {
+  const existing = existingDayWithName($("form-title").value);
+  if (!existing) {
+    return;
+  }
+  if (existing.type === "group") {
+    $("form-type").value = "group";
+    $("form-max").value = existing.maxMembers;
+  } else {
+    $("form-type").value = "individual";
+  }
+  showGroupFields();
 }
 
 // Adds one break row (name, start, end, remove) to the form.
@@ -91,8 +126,11 @@ function readBreaks() {
 
 // Reads every field in the form into one object.
 function readForm() {
+  const type = $("form-type").value === "group" ? "group" : "individual";
   return {
     title: $("form-title").value.trim(),
+    type: type,
+    maxMembers: type === "group" ? Number($("form-max").value) : 1,
     date: $("form-date").value,
     startTime: $("form-start").value,
     endTime: $("form-end").value,
@@ -162,6 +200,26 @@ function validateForm(form) {
   if (!form.title) {
     return "Add the presentation name. Use the same name for every day of the same presentation.";
   }
+  if (form.type === "group") {
+    const max = form.maxMembers;
+    if (!Number.isInteger(max) || max < 2 || max > 20) {
+      return "Max members per group must be a whole number from 2 to 20.";
+    }
+  }
+
+  // Every day of a presentation must have the same type (and the same group size).
+  const existing = existingDayWithName(form.title);
+  if (existing) {
+    const existingType = existing.type === "group" ? "group" : "individual";
+    if (existingType !== form.type) {
+      const typeWord = existingType === "group" ? "a group" : "an individual";
+      return "\u201c" + existing.title + "\u201d is already " + typeWord + " presentation. Use the same type, or a different name.";
+    }
+    if (form.type === "group" && Number(existing.maxMembers) !== form.maxMembers) {
+      return "\u201c" + existing.title + "\u201d already allows " + existing.maxMembers + " members per group. Use the same number.";
+    }
+  }
+
   if (!form.date) {
     return "Choose a date.";
   }
@@ -265,6 +323,7 @@ export function renderLecturer() {
 
     const dayCount = group.sessions.length;
     const summaryItems = [
+      el("span", { class: "group-count", text: presentationTypeText(group.sessions[0]) }),
       el("span", { class: "group-count", text: dayCount + (dayCount === 1 ? " day" : " days") }),
       el("span", { class: "pill lecturer", text: bookedSlots + " booked" }),
       el("span", { class: "pill student", text: (totalSlots - bookedSlots) + " available" }),
@@ -350,10 +409,22 @@ function renderSlotRow(slot, booking) {
   }
 
   const info = detailsFor(booking);
-  const studentCell = el("td", {},
-    el("b", { text: info.studentName || "Loading…" }),
-    el("div", { class: "small muted tnum", text: info.studentNumber || "" })
-  );
+  let studentCell;
+
+  if (info.groupNumber) {
+    // Group booking: group number, topic, members and who booked it.
+    studentCell = el("td", {},
+      el("b", { text: "Group " + info.groupNumber }),
+      info.groupTopic ? el("div", { class: "topic", text: info.groupTopic }) : null,
+      el("div", { class: "small", text: (info.members || []).join(", ") }),
+      el("div", { class: "small muted tnum", text: "Booked by " + (info.studentNumber || "") })
+    );
+  } else {
+    studentCell = el("td", {},
+      el("b", { text: info.studentName || "Loading…" }),
+      el("div", { class: "small muted tnum", text: info.studentNumber || "" })
+    );
+  }
   const actionCell = el("td", { class: "actions" },
     el("button", { type: "button", class: "link danger", onclick: () => removeBooking(booking) }, "Remove")
   );
@@ -367,7 +438,7 @@ function renderSlotRow(slot, booking) {
 async function removeBooking(booking) {
   const when = formatTime(booking.start) + "–" + formatTime(booking.end);
   const confirmed = await askConfirm(
-    "Remove " + (detailsFor(booking).studentName || "this student") + "?",
+    "Remove " + whoBooked(detailsFor(booking)) + "?",
     "Their booking for " + when + " will be cancelled and the slot opens again.",
     "Remove booking"
   );
@@ -381,6 +452,14 @@ async function removeBooking(booking) {
   } catch (error) {
     showToast(friendlyError(error));
   }
+}
+
+// "Group 3" for a group booking, otherwise the student's name.
+function whoBooked(info) {
+  if (info.groupNumber) {
+    return "Group " + info.groupNumber;
+  }
+  return info.studentName || "this student";
 }
 
 // Changes where a presentation day takes place.
@@ -443,7 +522,15 @@ async function copySchedule(session) {
     let who = "Open";
     if (booking) {
       const info = detailsFor(booking);
-      who = (info.studentName || "Unnamed") + " (" + (info.studentNumber || "no number") + ")";
+      if (info.groupNumber) {
+        who = "Group " + info.groupNumber;
+        if (info.groupTopic) {
+          who = who + " – " + info.groupTopic;
+        }
+        who = who + " (" + (info.members || []).join(", ") + ")";
+      } else {
+        who = (info.studentName || "Unnamed") + " (" + (info.studentNumber || "no number") + ")";
+      }
     }
     lines.push(formatTime(slot.start) + "–" + formatTime(slot.end) + "  " + who);
   });

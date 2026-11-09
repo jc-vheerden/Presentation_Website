@@ -731,6 +731,11 @@ td b {
   font-weight: 500;
 }
 
+/* A group's presentation topic in the lecturer's timetable */
+td .topic {
+  font-style: italic;
+}
+
 td.actions {
   text-align: right;
 }
@@ -863,6 +868,8 @@ tr.break td {
 /* ---------- Pop-up dialogs ---------- */
 dialog {
   width: min(460px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px); /* long group forms scroll inside the pop-up */
+  overflow-y: auto;
   padding: 0;
   color: var(--ink);
   background: var(--surface);

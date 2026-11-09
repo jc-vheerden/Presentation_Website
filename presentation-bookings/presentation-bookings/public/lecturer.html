@@ -92,6 +92,18 @@
             <div class="muted small">Use the same name for every day of the same presentation. Students can book one slot per presentation.</div>
           </div>
           <div class="field">
+            <label for="form-type">Presentation type</label>
+            <select id="form-type">
+              <option value="individual">Individual</option>
+              <option value="group">Group</option>
+            </select>
+          </div>
+          <!-- Only shown for group presentations -->
+          <div class="field hidden" id="max-field">
+            <label for="form-max">Max members per group</label>
+            <input id="form-max" type="number" min="2" max="20" step="1" value="4">
+          </div>
+          <div class="field">
             <label for="form-date">Date</label>
             <input id="form-date" type="date" required>
           </div>

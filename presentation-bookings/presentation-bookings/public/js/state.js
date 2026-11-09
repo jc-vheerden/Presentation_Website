@@ -52,7 +52,30 @@ export function myBookingForPresentation(session) {
   });
 }
 
+// True if this day belongs to a group presentation.
+export function isGroupPresentation(session) {
+  return session.type === "group";
+}
 
+// True if another booking for the same presentation already uses this group number.
+export function groupAlreadyBooked(session, groupNumber) {
+  const key = presentationKey(session);
+  return state.bookings.some((booking) => {
+    if (Number(booking.groupNumber) !== Number(groupNumber)) {
+      return false;
+    }
+    const bookedDay = state.sessions.find((item) => item.id === booking.sessionId);
+    return Boolean(bookedDay) && presentationKey(bookedDay) === key;
+  });
+}
+
+// Short description of the presentation type, e.g. "Group · max 4" or "Individual".
+export function presentationTypeText(session) {
+  if (isGroupPresentation(session)) {
+    return "Group · max " + session.maxMembers;
+  }
+  return "Individual";
+}
 
 // True if the booking belongs to the signed-in student.
 export function isMine(booking) {

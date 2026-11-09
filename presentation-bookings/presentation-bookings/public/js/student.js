@@ -2,7 +2,18 @@
 // Student view: see open slots, book one per presentation, cancel your booking.
 // =========================================================
 
-import { state, findBooking, isMine, upcomingSessions, bookingId, myBookingForPresentation } from "./state.js";
+import {
+  state,
+  findBooking,
+  isMine,
+  upcomingSessions,
+  bookingId,
+  myBookingForPresentation,
+  detailsFor,
+  isGroupPresentation,
+  groupAlreadyBooked,
+  presentationTypeText,
+} from "./state.js";
 import { formatTime, formatDate, slotsForSession, breaksBetween } from "./time.js";
 import { $, el, showToast, askConfirm, friendlyError } from "./ui.js";
 import { bookSlot, cancelBooking, studentNumberOf } from "./firebase.js";
@@ -50,11 +61,18 @@ function renderMyBookings() {
     const when = formatDate(session.date) + ", " + formatTime(booking.start) + "–" + formatTime(booking.end);
     const where = "Venue: " + (session.venue || "TBC");
 
+    // For a group booking, also show the group number and topic.
+    const info = detailsFor(booking);
+    const groupText = info.groupNumber
+      ? "Group " + info.groupNumber + (info.groupTopic ? " · " + info.groupTopic : "")
+      : null;
+
     container.append(el("div", { class: "my-booking" },
       el("div", {},
         el("div", { class: "eyebrow", text: session.title || "Presentation" }),
         el("div", { class: "my-booking-when tnum", text: when }),
-        el("div", { class: "small", text: where })
+        el("div", { class: "small", text: where }),
+        groupText ? el("div", { class: "small", text: groupText }) : null
       ),
       el("button", { type: "button", class: "danger", onclick: () => cancelMyBooking(booking, session) }, "Cancel booking")
     ));
@@ -86,14 +104,18 @@ function renderPresentations() {
 
     // What shows next to the presentation name.
     const myBooking = myBookingForPresentation(group.sessions[0]);
-    let summaryItems;
+    let statusPill;
     if (myBooking) {
-      summaryItems = [el("span", { class: "pill lecturer", text: "Booked ✓" })];
+      statusPill = el("span", { class: "pill lecturer", text: "Booked ✓" });
     } else if (openSlots > 0) {
-      summaryItems = [el("span", { class: "pill student", text: openSlots + (openSlots === 1 ? " slot available" : " slots available") })];
+      statusPill = el("span", { class: "pill student", text: openSlots + (openSlots === 1 ? " slot available" : " slots available") });
     } else {
-      summaryItems = [el("span", { class: "pill warn", text: "Fully booked" })];
+      statusPill = el("span", { class: "pill warn", text: "Fully booked" });
     }
+    const summaryItems = [
+      el("span", { class: "group-count", text: presentationTypeText(group.sessions[0]) }),
+      statusPill,
+    ];
 
     // Presentations the student still needs to book start open.
     const dayCards = group.sessions.map((session) => renderDayCard(session));
@@ -195,8 +217,68 @@ function openBookingDialog(session, slot) {
     $("book-name").value = saved.name || "";
   }
 
+  // Group presentations also ask for the group number, members and topic.
+  const isGroup = isGroupPresentation(session);
+  $("group-fields").classList.toggle("hidden", !isGroup);
+  if (isGroup) {
+    buildMemberInputs(Number(session.maxMembers) || 2);
+  }
+
   $("book-dialog").showModal();
   $("book-name").focus();
+}
+
+// Adds a name box for each other group member (the person booking is member 1).
+function buildMemberInputs(maxMembers) {
+  const otherMembers = maxMembers - 1;
+  $("members-hint").textContent = "Groups can have up to " + maxMembers + " members, including you. Leave extra boxes empty.";
+
+  const box = $("book-members");
+  box.replaceChildren();
+  for (let i = 2; i <= maxMembers; i++) {
+    box.append(el("input", {
+      id: "book-member-" + i,
+      class: "member-name",
+      type: "text",
+      maxlength: "80",
+      placeholder: "Member " + i + " full name",
+      "aria-label": "Member " + i + " full name",
+    }));
+  }
+
+  if (otherMembers < 1) {
+    $("members-hint").textContent = "";
+  }
+}
+
+// Reads the group part of the form. Returns { error } or { groupNumber, members, topic }.
+function readGroupFields(session, name) {
+  const groupNumber = Number($("book-group").value);
+  const topic = $("book-topic").value.trim();
+
+  // The person booking is always the first member.
+  const members = [name];
+  for (const input of document.querySelectorAll("#book-members .member-name")) {
+    const memberName = input.value.trim();
+    if (memberName) {
+      members.push(memberName);
+    }
+  }
+
+  if (!Number.isInteger(groupNumber) || groupNumber < 1 || groupNumber > 999) {
+    return { error: "Enter your group number (a whole number, e.g. 3)." };
+  }
+  if (members.length < 2) {
+    return { error: "Add the names of the other members of your group." };
+  }
+  if (!topic) {
+    return { error: "Enter the topic of your presentation." };
+  }
+  if (groupAlreadyBooked(session, groupNumber)) {
+    return { error: "Group " + groupNumber + " already has a slot for this presentation. Only one member needs to book." };
+  }
+
+  return { groupNumber: groupNumber, members: members, topic: topic };
 }
 
 // Saves the booking when the student presses "Confirm booking".
@@ -227,6 +309,16 @@ async function handleBooking(event) {
     return;
   }
 
+  // For group presentations, check the group number, members and topic.
+  let group = null;
+  if (isGroupPresentation(session)) {
+    group = readGroupFields(session, name);
+    if (group.error) {
+      errorBox.textContent = group.error;
+      return;
+    }
+  }
+
   const button = $("book-confirm");
   button.disabled = true;
 
@@ -242,6 +334,11 @@ async function handleBooking(event) {
       bookedAt: new Date().toISOString(),
     };
 
+    // The group number is public too, so a group can't book twice.
+    if (group) {
+      slotInfo.groupNumber = group.groupNumber;
+    }
+
     // What only the lecturer (and this student) can see.
     const details = {
       sessionId: session.id,
@@ -250,6 +347,12 @@ async function handleBooking(event) {
       studentNumber: number,
       topic: presentation,
     };
+
+    if (group) {
+      details.groupNumber = group.groupNumber;
+      details.members = group.members;
+      details.groupTopic = group.topic;
+    }
 
     const booked = await bookSlot(bookingId(session.id, slot.index), slotInfo, details);
 
@@ -264,6 +367,8 @@ async function handleBooking(event) {
       // Saving on the device is optional, so ignore errors here.
     }
 
+    $("book-group").value = "";
+    $("book-topic").value = "";
     $("book-dialog").close();
     showToast("Booked: " + (presentation || "presentation") + ", " + formatDate(session.date) + " at " + formatTime(slot.start));
   } catch (error) {

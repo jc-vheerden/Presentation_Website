@@ -138,8 +138,25 @@
       </div>
       <div id="book-summary" class="dialog-summary tnum"></div>
       <div class="field full">
-        <label for="book-name">Full name</label>
+        <label for="book-name">Your full name</label>
         <input id="book-name" type="text" required maxlength="80" autocomplete="name">
+      </div>
+
+      <!-- Only shown for group presentations (student.js shows it) -->
+      <div id="group-fields" class="stack hidden">
+        <div class="field full">
+          <label for="book-group">Group number</label>
+          <input id="book-group" type="number" min="1" max="999" step="1" inputmode="numeric">
+        </div>
+        <div class="field full">
+          <span class="field-label" id="members-label">Other group members</span>
+          <div id="members-hint" class="muted small"></div>
+          <div id="book-members" class="stack" role="group" aria-labelledby="members-label"></div>
+        </div>
+        <div class="field full">
+          <label for="book-topic">Topic of your presentation</label>
+          <input id="book-topic" type="text" maxlength="150">
+        </div>
       </div>
 
       <div id="book-error" class="error"></div>
